@@ -1,0 +1,3029 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FFCS Timetable Planner</title>
+  <style>
+    :root {
+      --ink: #0d2853;
+      --muted: #5f6876;
+      --line: #c9d0d7;
+      --panel: #ffffff;
+      --bg: #f3f5f8;
+      --navy: #172d52;
+      --green: #29a84a;
+      --red: #df5454;
+      --blue: #1976d2;
+      --orange: #ff9f1c;
+      --teal: #00897b;
+      --violet: #8e24aa;
+      --warn: #fff6df;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: #1b2430;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    main {
+      width: min(1850px, calc(100% - 48px));
+      margin: 30px auto 40px;
+    }
+
+    h1 {
+      margin: 0 0 26px;
+      text-align: center;
+      color: var(--ink);
+      font-size: clamp(30px, 3vw, 42px);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .courses {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+      gap: 26px;
+    }
+
+    .course-card {
+      border-top: 6px solid var(--accent);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 6px 18px rgba(15, 35, 70, .12);
+      padding: 26px 24px 28px;
+      min-height: 188px;
+    }
+
+    .course-card h2 {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 22px;
+      color: var(--ink);
+      font-size: 29px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .course-card small {
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      color: #151a22;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    select {
+      width: 100%;
+      min-height: 49px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 0 18px;
+      font-size: 18px;
+      color: #111820;
+    }
+
+    select:disabled {
+      color: #8a93a1;
+      background: #f7f8fa;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 275px 1fr;
+      gap: 14px;
+      margin: 38px 0 28px;
+      align-items: center;
+    }
+
+    button {
+      min-height: 53px;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .clear { background: var(--red); }
+    .download { background: var(--green); }
+
+    .notice {
+      display: none;
+      margin: -10px 0 18px;
+      border: 1px solid #e9c56a;
+      border-radius: 8px;
+      background: var(--warn);
+      padding: 12px 14px;
+      color: #72530b;
+      font-weight: 700;
+    }
+
+    .notice.show { display: block; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #8e98a8;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1320px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid #9aa3ad;
+      text-align: center;
+      vertical-align: middle;
+      height: 50px;
+      padding: 6px;
+      font-size: 12px;
+      line-height: 1.22;
+      letter-spacing: 0;
+    }
+
+    thead th, .day, .row-head {
+      background: var(--navy);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .day, .row-head { width: 138px; }
+    .base { color: #617493; }
+    .lunch { background: #eef1f4; }
+    thead .lunch { background: #cad3d8; color: transparent; }
+
+    .cell-stack {
+      display: grid;
+      gap: 4px;
+      justify-items: center;
+    }
+
+    .chip {
+      max-width: 100%;
+      border-radius: 5px;
+      padding: 3px 6px;
+      color: #fff;
+      font-weight: 800;
+      font-size: 11px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .conflict .chip { outline: 2px solid #ffeb3b; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: var(--dot);
+      vertical-align: -1px;
+    }
+
+    @media (max-width: 1020px) {
+      main { width: min(100% - 28px, 920px); }
+      .courses { grid-template-columns: repeat(2, minmax(240px, 1fr)); }
+      .actions { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .courses { grid-template-columns: 1fr; }
+      .course-card { padding: 22px 18px; }
+      .course-card h2 { font-size: 25px; }
+      select { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>FFCS Timetable Planner</h1>
+
+    <section class="courses" id="courses"></section>
+
+    <div class="actions">
+      <button class="clear" id="clearBtn">Clear All</button>
+      <button class="download" id="downloadBtn">Download Timetable</button>
+    </div>
+
+    <div class="notice" id="notice"></div>
+
+    <div class="table-wrap">
+      <table id="timetable" aria-label="FFCS timetable grid"></table>
+    </div>
+
+    <div class="legend" id="legend"></div>
+  </main>
+
+  <script>
+    const courses = [
+      {
+            "code": "MGT1040",
+            "title": "Entrepreneurship",
+            "color": "#ff9f1c",
+            "theory": [
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "ONL00003",
+                        "faculty": "N.Prabhakar",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "ONL00005",
+                        "faculty": "Ritambhara Sharma",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "ONLOOOOI",
+                        "faculty": "Umer Mushtaq lone",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONL00002",
+                        "faculty": "Deepjoy Katuwal",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONLOOOOI",
+                        "faculty": "Dripta De Joarder",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONL00004",
+                        "faculty": "Karishma Bisht",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONLOOOI",
+                        "faculty": "Rajashree Naik",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONL00005",
+                        "faculty": "Srirupa Poddar",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONL00003",
+                        "faculty": "Sudesh Manger",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "ONL00008",
+                        "faculty": "Umer Mushtaq Ione",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F1+TF1",
+                        "venue": "ONLOOOI",
+                        "faculty": "Karishma Bisht",
+                        "availability": "1",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "ONL00003",
+                        "faculty": "EEDI SURESH",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "ONL00006",
+                        "faculty": "NAGA NIVEDITA GUNTUR",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "ONL00009",
+                        "faculty": "Prof.VSB Digital Courses Faculty-2",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TFF2",
+                        "venue": "ONLOOOIO",
+                        "faculty": "Prof.VSB Digital Courses Faculty-4",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "ONL0002",
+                        "faculty": "EEDI SURESH",
+                        "availability": "29",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "ONL00016",
+                        "faculty": "NAGA NIVEDITA GUNTUR",
+                        "availability": "9",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "ONL00017",
+                        "faculty": "Prof.VSB Digital Courses Faculty-2",
+                        "availability": "36",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": []
+      },
+      {
+            "code": "CSE2001",
+            "title": "Data Structures and Algorithms",
+            "color": "#1976d2",
+            "theory": [
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-230",
+                        "faculty": "Deepasikha Mishra",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-G18",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-G17",
+                        "faculty": "RUPA CHIRAMADASU",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-231",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-225",
+                        "faculty": "Sandipan Maiti",
+                        "availability": "57",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-226",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-G16",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-G19",
+                        "faculty": "Aravapalli Rama Satish",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-101",
+                        "faculty": "KANHAIYA SHARMA",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-105",
+                        "faculty": "MADALA GARGI",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-102",
+                        "faculty": "MATTAKOYYAAHARONU",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-G14",
+                        "faculty": "MEKATHOTI VAMSI KIRAN",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-G17",
+                        "faculty": "POPURI SRINIVASA RAO",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-218",
+                        "faculty": "Deepasikha Mishra",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-225",
+                        "faculty": "Ganji Tejasree",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-220",
+                        "faculty": "Jonnadula Harikiran",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-219",
+                        "faculty": "Ravi Sankar Barpanda",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-230",
+                        "faculty": "Samuka Mohanty",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-226",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-G16",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-514",
+                        "faculty": "KANHAIYA SHARMA",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-519",
+                        "faculty": "MATTAKOYYAAHARONU",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-520",
+                        "faculty": "MEKATHOTI VAMSI KIRAN",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-516",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-513",
+                        "faculty": "SYAMALA MURALI KRISHNA",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "CB-518",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-322",
+                        "faculty": "Koduru Hajarathaiah",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-316",
+                        "faculty": "Nagaraju Devarakonda",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-323",
+                        "faculty": "PUTTA DURGA",
+                        "availability": "56",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-425",
+                        "faculty": "Paidipogu Sowjanya",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-231",
+                        "faculty": "Prabha Selvaraj",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-314",
+                        "faculty": "Radha Mohan Pattanayak",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-325",
+                        "faculty": "Samuka Mohanty",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-315",
+                        "faculty": "Sandipan Maiti",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-422",
+                        "faculty": "Yallanti Sowjanya Kumari",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-323",
+                        "faculty": "Anurag De",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-317",
+                        "faculty": "Chirra Venkata Ramireddy",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-314",
+                        "faculty": "Koduru Hajarathaiah",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-315",
+                        "faculty": "MEKATHOTI VAMSI KIRAN",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-IIO",
+                        "faculty": "Nagaraju Devarakonda",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-226",
+                        "faculty": "P. Kuppusamy",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-316",
+                        "faculty": "Paidipogu Sowjanya",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-322",
+                        "faculty": "Priyanka Singh",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-GII",
+                        "faculty": "Pujari Jeevana Jyothi",
+                        "availability": "69",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-230",
+                        "faculty": "Radha Mohan Pattanayak",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-225",
+                        "faculty": "Shaik Kareemulla",
+                        "availability": "70",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-231",
+                        "faculty": "Shaik Subhani",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-G15",
+                        "faculty": "Srikanth Busa",
+                        "availability": "69",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": [
+                  {
+                        "slot": "L11+L12",
+                        "venue": "CB-409",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L11+L12",
+                        "venue": "CB-405",
+                        "faculty": "Shaik Subhani",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L13+L14",
+                        "venue": "CB-122",
+                        "faculty": "Paidipogu Sowjanya",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L13+L14",
+                        "venue": "CB-409",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-23",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L15+L16",
+                        "venue": "CB-102",
+                        "faculty": "MEKATHOTI VAMSI KIRAN",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L19+L20",
+                        "venue": "CB-102",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L19+L20",
+                        "venue": "CB-209",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L21+L22",
+                        "venue": "CB-105",
+                        "faculty": "MEKATHOTI VAMSI KIRAN",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L21+L22",
+                        "venue": "CB-102",
+                        "faculty": "Paidipogu Sowjanya",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L23+L24",
+                        "venue": "CB-102",
+                        "faculty": "Deepasikha Mishra",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L23+L24",
+                        "venue": "CB-105",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L25+L26",
+                        "venue": "CB-409",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L25+L26",
+                        "venue": "CB-209",
+                        "faculty": "Shaik Subhani",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L27+L28",
+                        "venue": "CB-105",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L29+L30",
+                        "venue": "CB-105",
+                        "faculty": "Naga Jagadesh Bommagani",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L29+L30",
+                        "venue": "CB-102",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L3+L4",
+                        "venue": "CB-102",
+                        "faculty": "Paidipogu Sowjanya",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L3+L4",
+                        "venue": "CB-105",
+                        "faculty": "Prabha Selvaraj",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L3+L4",
+                        "venue": "CB-IOI",
+                        "faculty": "Srikanth Busa",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L31+L32",
+                        "venue": "ONL01003",
+                        "faculty": "BALARAJU RAMESH",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L31+L32",
+                        "venue": "CB-106",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L31+L32",
+                        "venue": "CB-121",
+                        "faculty": "Sandipan Maiti",
+                        "availability": "55",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L33+L34",
+                        "venue": "CB-105",
+                        "faculty": "Deepasikha Mishra",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L33+L34",
+                        "venue": "CB-102",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L35+L36",
+                        "venue": "CB-409",
+                        "faculty": "Ravi Sankar Barpanda",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L35+L36",
+                        "venue": "CB-122",
+                        "faculty": "Srikanth Busa",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L37+L38",
+                        "venue": "CB-105",
+                        "faculty": "Radha Mohan Pattanayak",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L37+L38",
+                        "venue": "CB-102",
+                        "faculty": "Srikanth Busa",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L39+L40",
+                        "venue": "CB-105",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L39+L40",
+                        "venue": "CB-106",
+                        "faculty": "SYAMALA MURALI KRISHNA",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L41+L42",
+                        "venue": "CB-106",
+                        "faculty": "Koduru Hajarathaiah",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L41+L42",
+                        "venue": "CB-121",
+                        "faculty": "Samuka Mohanty",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L43+L44",
+                        "venue": "CB-105",
+                        "faculty": "Naga Jagadesh Bommagani",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L43+L44",
+                        "venue": "CB-102",
+                        "faculty": "Pamulapati Ashok Reddy",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L45+L46",
+                        "venue": "CB-105",
+                        "faculty": "Radha Mohan Pattanayak",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L45+L46",
+                        "venue": "CB-106",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L47+L48",
+                        "venue": "CB-122",
+                        "faculty": "SYAMALA MURALI KRISHNA",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L47+L48",
+                        "venue": "CB-121",
+                        "faculty": "Srikanth Busa",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L49+L50",
+                        "venue": "CB-121",
+                        "faculty": "Ravi Sankar Barpanda",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L49+L50",
+                        "venue": "CB-106",
+                        "faculty": "Sandipan Maiti",
+                        "availability": "63",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L5+L6",
+                        "venue": "CB-102",
+                        "faculty": "Radha Mohan Pattanayak",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L5+L6",
+                        "venue": "CB-IOI",
+                        "faculty": "SYAMALA MURALI KRISHNA",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L51+L52",
+                        "venue": "CB-IOI",
+                        "faculty": "Koduru Hajarathaiah",
+                        "availability": "65",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L51+L52",
+                        "venue": "CB-102",
+                        "faculty": "Sanal Kumar T S",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L53+L54",
+                        "venue": "CB-122",
+                        "faculty": "KANHAIYA SHARMA",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L53+L54",
+                        "venue": "CB-202",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L55+L56",
+                        "venue": "CB-105",
+                        "faculty": "PUTTA DURGA",
+                        "availability": "56",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L55+L56",
+                        "venue": "CB-102",
+                        "faculty": "Prabha Selvaraj",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L7+L8",
+                        "venue": "CB-202",
+                        "faculty": "Naga Jagadesh Bommagani",
+                        "availability": "55",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L7+L8",
+                        "venue": "CB-122",
+                        "faculty": "SYAMALA MURALI KRISHNA",
+                        "availability": "64",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L9+L10",
+                        "venue": "CB-106",
+                        "faculty": "Saroja Kumar Rout",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L9+L10",
+                        "venue": "CB-105",
+                        "faculty": "Sheela jayachandran",
+                        "availability": "63",
+                        "kind": "lab"
+                  }
+            ]
+      },
+      {
+            "code": "CSE3002",
+            "title": "Artificial Intelligence",
+            "color": "#43a047",
+            "theory": [
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-511",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "47",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-501",
+                        "faculty": "Balusa Bhanu Chander",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-506",
+                        "faculty": "Mannepuli Srujana",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-510",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "54",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-513",
+                        "faculty": "Mukkoti Maruthi Venkata Chalapathi",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-516",
+                        "faculty": "Reeja S R",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-512",
+                        "faculty": "Shaik Subhani",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-505",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-514",
+                        "faculty": "Suma Kamalesh Gandhimathi",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-504",
+                        "faculty": "Surendra Reddy Vinta",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-507",
+                        "faculty": "Suresh Dara",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-325",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "39",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-324",
+                        "faculty": "Balusa Bhanu Chander",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-506",
+                        "faculty": "Mannepuli Srujana",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-501",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-504",
+                        "faculty": "Mukkoti Maruthi Venkata Chalapathi",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-425",
+                        "faculty": "Shaik Subhani",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-424",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-505",
+                        "faculty": "Suma Kamalesh Gandhimathi",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-423",
+                        "faculty": "Surendra Reddy Vinta",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-507",
+                        "faculty": "Suresh Dara",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-422",
+                        "faculty": "Yarlagadda Siva Reshma",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-325",
+                        "faculty": "Afzal Hussain Shahid",
+                        "availability": "56",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-324",
+                        "faculty": "Azees Maria John Francis",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-422",
+                        "faculty": "Burla Nagaraju",
+                        "availability": "56",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-323",
+                        "faculty": "Ganesh Reddy Karri",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-423",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-13",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-322",
+                        "faculty": "Yarlagadda Siva Reshma",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TCC1",
+                        "venue": "AB2-G14",
+                        "faculty": "Arindam Dey",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TCC1",
+                        "venue": "AB2-G17",
+                        "faculty": "MITHILESH KUMAR DUBEY",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TCC1",
+                        "venue": "AB2-G19",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-22",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-424",
+                        "faculty": "Arindam Dey",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-504",
+                        "faculty": "Ganesh Reddy Karri",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-422",
+                        "faculty": "MITHILESH KUMAR DUBEY",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-423",
+                        "faculty": "Yarlagadda Siva Reshma",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-501",
+                        "faculty": "Yelepi Usha Rani",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-G19",
+                        "faculty": "Azees Maria John Francis",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-G17",
+                        "faculty": "Burla Nagaraju",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-102",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-13",
+                        "availability": "68",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-105",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-22",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-101",
+                        "faculty": "Suresh Dara",
+                        "availability": "64",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": [
+                  {
+                        "slot": "L11+L12",
+                        "venue": "CB-307",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "34",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L11+L12",
+                        "venue": "CB-321",
+                        "faculty": "Ganesh Reddy Karri",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L11+L12",
+                        "venue": "ONL01012",
+                        "faculty": "Mannepuli Srujana",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L13+L14",
+                        "venue": "CB-228",
+                        "faculty": "Mannepuli Srujana",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L13+L14",
+                        "venue": "CB-209",
+                        "faculty": "Suma Kamalesh Gandhimathi",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L15+L16",
+                        "venue": "CB-106",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "56",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L15+L16",
+                        "venue": "CB-105",
+                        "faculty": "Balusa Bhanu Chander",
+                        "availability": "56",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L19+L20",
+                        "venue": "CB-228",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "60",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L19+L20",
+                        "venue": "CB-301",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L21+L22",
+                        "venue": "CB-106",
+                        "faculty": "Arindam Dey",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L23+L24",
+                        "venue": "CB-121",
+                        "faculty": "Afzal Hussain Shahid",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L23+L24",
+                        "venue": "CB-106",
+                        "faculty": "Burla Nagaraju",
+                        "availability": "57",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L25+L26",
+                        "venue": "CB-228",
+                        "faculty": "Azees Maria John Francis",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L25+L26",
+                        "venue": "CB-301",
+                        "faculty": "Surendra Reddy Vinta",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L27+L28",
+                        "venue": "CB-106",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L29+L30",
+                        "venue": "CB-106",
+                        "faculty": "Yarlagadda Siva Reshma",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L3+L4",
+                        "venue": "CB-106",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "57",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L31+L32",
+                        "venue": "CB-405",
+                        "faculty": "Afzal Hussain Shahid",
+                        "availability": "56",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L31+L32",
+                        "venue": "CB-122",
+                        "faculty": "Arindam Dey",
+                        "availability": "55",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L33+L34",
+                        "venue": "CB-106",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "57",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L35+L36",
+                        "venue": "CB-228",
+                        "faculty": "Burla Nagaraju",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L35+L36",
+                        "venue": "CB-209",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-I",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L37+L38",
+                        "venue": "CB-106",
+                        "faculty": "Balusa Bhanu Chander",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L37+L38",
+                        "venue": "CB-121",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L39+L40",
+                        "venue": "CB-121",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L39+L40",
+                        "venue": "CB-122",
+                        "faculty": "Suma Kamalesh Gandhimathi",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L41+L42",
+                        "venue": "CB-202",
+                        "faculty": "Afzal Hussain Shahid",
+                        "availability": "54",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L41+L42",
+                        "venue": "CB-122",
+                        "faculty": "Ajith Jubilson E",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L43+L44",
+                        "venue": "CB-106",
+                        "faculty": "Mukkoti Maruthi Venkata Chalapathi",
+                        "availability": "47",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L45+L46",
+                        "venue": "CB-121",
+                        "faculty": "Azees Maria John Francis",
+                        "availability": "54",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L47+L48",
+                        "venue": "CB-209",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-25",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L47+L48",
+                        "venue": "CB-202",
+                        "faculty": "Prof. SCOPE Digital Courses Faculty-I",
+                        "availability": "52",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L49+L50",
+                        "venue": "CB-122",
+                        "faculty": "Mukkoti Maruthi Venkata Chalapathi",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L49+L50",
+                        "venue": "CB-202",
+                        "faculty": "Surendra Reddy Vinta",
+                        "availability": "54",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L5+L6",
+                        "venue": "CB-105",
+                        "faculty": "Suma Kamalesh Gandhimathi",
+                        "availability": "58",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L5+L6",
+                        "venue": "CB-121",
+                        "faculty": "Suresh Dara",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L51+L52",
+                        "venue": "CB-105",
+                        "faculty": "Ganesh Reddy Karri",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L53+L54",
+                        "venue": "CB-228",
+                        "faculty": "Azees Maria John Francis",
+                        "availability": "",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L55+L56",
+                        "venue": "CB-121",
+                        "faculty": "Afzal Hussain Shahid",
+                        "availability": "59",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L55+L56",
+                        "venue": "CB-106",
+                        "faculty": "Arindam Dey",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L55+L56",
+                        "venue": "CB-122",
+                        "faculty": "Siddique Ibrahim Peer Mohamed",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L7+L8",
+                        "venue": "CB-209",
+                        "faculty": "Balusa Bhanu Chander",
+                        "availability": "62",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L7+L8",
+                        "venue": "CB-228",
+                        "faculty": "Monali Bordoloi",
+                        "availability": "61",
+                        "kind": "lab"
+                  },
+                  {
+                        "slot": "L9+L10",
+                        "venue": "CB-121",
+                        "faculty": "Arindam Dey",
+                        "availability": "59",
+                        "kind": "lab"
+                  }
+            ]
+      },
+      {
+            "code": "MAT1003",
+            "title": "Discrete Mathematical Structures",
+            "color": "#8e24aa",
+            "theory": [
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-102",
+                        "faculty": "Francis P",
+                        "availability": "49",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-105",
+                        "faculty": "Komandla Mahipal Reddy",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-214",
+                        "faculty": "Manoj Kumar Mishra",
+                        "availability": "55",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-101",
+                        "faculty": "Perumandla Karunakar",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-111",
+                        "faculty": "Prashant Patel",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-G14",
+                        "faculty": "Prashanth Maroju",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-215",
+                        "faculty": "SANTANU MANDAL",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-212",
+                        "faculty": "Shalini",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-216",
+                        "faculty": "Sudhakar M",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-112",
+                        "faculty": "V. Raja",
+                        "availability": "57",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "AB2-118",
+                        "faculty": "Venkatrajam Marka",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-102",
+                        "faculty": "Francis P",
+                        "availability": "55",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-216",
+                        "faculty": "Manisha Maity",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-111",
+                        "faculty": "Manoj Kumar Mishra",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-112",
+                        "faculty": "N Rajashekar",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-212",
+                        "faculty": "Peeyush Singh",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-G16",
+                        "faculty": "Perumandla Karunakar",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-105",
+                        "faculty": "Prashanth Maroju",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-215",
+                        "faculty": "SANTANU MANDAL",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-G15",
+                        "faculty": "Soumen Kundu",
+                        "availability": "52",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-214",
+                        "faculty": "Sudhakar M",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "AB2-101",
+                        "faculty": "V. Raja",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+SC1+TC1",
+                        "venue": "CB-113",
+                        "faculty": "Arun Kumar Yadav",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+SC1+TC1",
+                        "venue": "AB2-220",
+                        "faculty": "Pradip R. Patle",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+SC1+TC1",
+                        "venue": "C 114",
+                        "faculty": "Shobhit Kumar Srivastava",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-G12",
+                        "faculty": "Amrendra Singh Gill",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-G14",
+                        "faculty": "Gokulnath M",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-G18",
+                        "faculty": "Jyotsna Sharma",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-112",
+                        "faculty": "Manisha Maity",
+                        "availability": "54",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-GII",
+                        "faculty": "Mo Faheem",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-108",
+                        "faculty": "Piu Kundu",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-107",
+                        "faculty": "Riya",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1+TCC1",
+                        "venue": "CB-G13",
+                        "faculty": "S V Gomathi",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+SC2+TC2",
+                        "venue": "CB-109",
+                        "faculty": "Arun Kumar Yadav",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+SC2+TC2",
+                        "venue": "CB-III",
+                        "faculty": "Chandan Kumar Thakur",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+SC2+TC2",
+                        "venue": "CB-112",
+                        "faculty": "S V Gomathi",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-G14",
+                        "faculty": "Gokulnath M",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-220",
+                        "faculty": "Jyotsna Sharma",
+                        "availability": "25",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-219",
+                        "faculty": "Mo Faheem",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-G15",
+                        "faculty": "Pradip R. Patie",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-G16",
+                        "faculty": "Prashant Patel",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-G17",
+                        "faculty": "Riya",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-225",
+                        "faculty": "Shobhit Kumar Srivastava",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2+TCC2",
+                        "venue": "CB-218",
+                        "faculty": "Soumen Kundu",
+                        "availability": "64",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": []
+      },
+      {
+            "code": "ECE2002",
+            "title": "Computer Organization and Architecture",
+            "color": "#f4511e",
+            "theory": [
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G13",
+                        "faculty": "Ajay Dagar",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G17",
+                        "faculty": "Ashish Gupta",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G12",
+                        "faculty": "Atul Shankar Mani Tripathi",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-GII",
+                        "faculty": "Chandan Nayak",
+                        "availability": "44",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G18",
+                        "faculty": "Debanjali Sarkar",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-107",
+                        "faculty": "KADIYAM RAJSHEKAR",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-108",
+                        "faculty": "M. Krishnasamy",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-109",
+                        "faculty": "MADDULURI SUNEETHA",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G16",
+                        "faculty": "Neeraj Kumar Misra",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G14",
+                        "faculty": "PILLI-JTLA SIVA RAMAKRISHNA",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A1+TA1+TAA1",
+                        "venue": "CB-G15",
+                        "faculty": "Praveen Maurya",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-112",
+                        "faculty": "ARKDEV",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-113",
+                        "faculty": "Abdul Kayom Md Khairuzzaman",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-215",
+                        "faculty": "Agam Das Goswami",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-114",
+                        "faculty": "Ajay Dagar",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-G18",
+                        "faculty": "Ankur Pandey",
+                        "availability": "53",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-109",
+                        "faculty": "G Bharath Reddy",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-231",
+                        "faculty": "Girish Kumar Mekala",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-G17",
+                        "faculty": "Jayashree Pradhan",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-III",
+                        "faculty": "KADIYAM RAJSHEKAR",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-G16",
+                        "faculty": "Kritika Bansal",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2+TAA2",
+                        "venue": "CB-314",
+                        "faculty": "Sambhudutta Nanda",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-G18",
+                        "faculty": "ARKDEV",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-G17",
+                        "faculty": "Abdul Kayom Md Khairuzzaman",
+                        "availability": "58",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-218",
+                        "faculty": "Agam Das Goswami",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-219",
+                        "faculty": "Ankur Pandey",
+                        "availability": "59",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-216",
+                        "faculty": "G Bharath Reddy",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-220",
+                        "faculty": "Jayashree Pradhan",
+                        "availability": "52",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-230",
+                        "faculty": "Jayendra Kumar",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-225",
+                        "faculty": "Kritika Bansal",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-226",
+                        "faculty": "Moumita Saha",
+                        "availability": "62",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-231",
+                        "faculty": "Sambhudutta Nanda",
+                        "availability": "60",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1+TBB1",
+                        "venue": "CB-217",
+                        "faculty": "Vivek Upadhyaya",
+                        "availability": "63",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-217",
+                        "faculty": "Ashish Gupta",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-112",
+                        "faculty": "Atul Shankar Mani Tripathi",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-III",
+                        "faculty": "Chandan Nayak",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-219",
+                        "faculty": "Debanjali Sarkar",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-220",
+                        "faculty": "M. Krishnasamy",
+                        "availability": "54",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-225",
+                        "faculty": "MADDULURI SUNEETHA",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-113",
+                        "faculty": "Moumita Saha",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-216",
+                        "faculty": "Neeraj Kumar Misra",
+                        "availability": "65",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "B\u2014114",
+                        "faculty": "PILLUTLA SIVA RAMAKRISHNA",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-215",
+                        "faculty": "Praveen Maurya",
+                        "availability": "64",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2+TBB2",
+                        "venue": "CB-218",
+                        "faculty": "Vivek Upadhyaya",
+                        "availability": "50",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": []
+      },
+      {
+            "code": "STS2010",
+            "title": "Qualitative And Quantitative Skills Practice - I",
+            "color": "#00897b",
+            "theory": [
+                  {
+                        "slot": "A1+TA1",
+                        "venue": "CB-316",
+                        "faculty": "Prof.Six Phrase Faculty-9",
+                        "availability": "80",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-G13",
+                        "faculty": "MANIKANTA K",
+                        "availability": "97",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-G12",
+                        "faculty": "Mamatha",
+                        "availability": "97",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "A2+TA2",
+                        "venue": "CB-GII",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-I",
+                        "availability": "97",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1",
+                        "venue": "CB-G13",
+                        "faculty": "Prof Musthaq",
+                        "availability": "97",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1",
+                        "venue": "CB-G14",
+                        "faculty": "Prof.Six Phrase Faculty-9",
+                        "availability": "98",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1",
+                        "venue": "CB-GII",
+                        "faculty": "Prof.VISH Digital Courses Faculty-4",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B1+TB1",
+                        "venue": "CB-G12",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-5",
+                        "availability": "100",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2",
+                        "venue": "CB-G12",
+                        "faculty": "Prof Musthaq",
+                        "availability": "99",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2",
+                        "venue": "CB-GII",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-3",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "B2+TB2",
+                        "venue": "CB-G13",
+                        "faculty": "RAMESH",
+                        "availability": "98",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TC1",
+                        "venue": "CB-G15",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-4",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TCC1",
+                        "venue": "CB-G16",
+                        "faculty": "K MANI",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C1+TCC1",
+                        "venue": "CB-G17",
+                        "faculty": "RAMESH",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-317",
+                        "faculty": "DURGA PRASAD L",
+                        "availability": "",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TC2",
+                        "venue": "CB-G18",
+                        "faculty": "K MANI",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "C2+TCC2",
+                        "venue": "AB2-212",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-5",
+                        "availability": "98",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "14",
+                        "faculty": "DURGA PRASAD L",
+                        "availability": "79",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TD1",
+                        "venue": "CB-G12",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-4",
+                        "availability": "92",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "CB-G15",
+                        "faculty": "MANIKANTA K",
+                        "availability": "96",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D1+TDD1",
+                        "venue": "AB2-212",
+                        "faculty": "Mamatha",
+                        "availability": "95",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-G13",
+                        "faculty": "Prof Sumanth",
+                        "availability": "97",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-G12",
+                        "faculty": "Prof.VISH Digital Courses Faculty-5",
+                        "availability": "99",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TD2",
+                        "venue": "CB-G 14",
+                        "faculty": "RAMESH",
+                        "availability": "99",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "AB2-214",
+                        "faculty": "Mamatha",
+                        "availability": "80",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "D2+TDD2",
+                        "venue": "AB2-212",
+                        "faculty": "Prof.VISH Digital Courses Faculty-I",
+                        "availability": "99",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-218",
+                        "faculty": "Prof Musthaq",
+                        "availability": "66",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-GII",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-I",
+                        "availability": "76",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E1+TE1",
+                        "venue": "CB-220",
+                        "faculty": "RAMESH",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-220",
+                        "faculty": "MANIKANTA K",
+                        "availability": "75",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-219",
+                        "faculty": "Prof Musthaq",
+                        "availability": "76",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "CB-G 14",
+                        "faculty": "Prof Sumanth",
+                        "availability": "88",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "E2+TE2",
+                        "venue": "AB2-111",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-2",
+                        "availability": "56",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-314",
+                        "faculty": "DURGA PRASAD L",
+                        "availability": "51",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-G17",
+                        "faculty": "K MANI",
+                        "availability": "91",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-231",
+                        "faculty": "MANIKANTA K",
+                        "availability": "76",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-G18",
+                        "faculty": "Mamatha",
+                        "availability": "80",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-G15",
+                        "faculty": "Prof.VISH Digital Courses Faculty-2",
+                        "availability": "93",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TF2",
+                        "venue": "CB-G16",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-4",
+                        "availability": "93",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TFF2",
+                        "venue": "CB-324",
+                        "faculty": "Prof.Six Phrase Faculty-9",
+                        "availability": "61",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "F2+TFF2",
+                        "venue": "CB-323",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-5",
+                        "availability": "74",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "ONL00214",
+                        "faculty": "MANOJ D",
+                        "availability": "116",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "ONL00217",
+                        "faculty": "Prof.Six Phrase Faculty-6",
+                        "availability": "124",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G1+TG1",
+                        "venue": "AB2-215",
+                        "faculty": "Prof.VlSH Digital Courses Faculty-3",
+                        "availability": "67",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G2+TG2",
+                        "venue": "AB2-216",
+                        "faculty": "Jayesh",
+                        "availability": "79",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G2+TG2",
+                        "venue": "AB2-215",
+                        "faculty": "MANOJ D",
+                        "availability": "49",
+                        "kind": "theory"
+                  },
+                  {
+                        "slot": "G2+TG2",
+                        "venue": "AB2-218",
+                        "faculty": "Prof.Six Phrase Faculty-9",
+                        "availability": "74",
+                        "kind": "theory"
+                  }
+            ],
+            "lab": []
+      }
+];
+
+    const timeHeaders = [
+      ["8:00 AM", "to", "8:50 AM"],
+      ["9:00 AM", "to", "9:50 AM"],
+      ["10:00 AM", "to", "10:50 AM"],
+      ["11:00 AM", "to", "11:50 AM"],
+      ["12:00 PM", "to", "12:50 PM"],
+      ["12:51 PM", "", ""],
+      ["Lunch", "", ""],
+      ["2:00 PM", "to", "2:50 PM"],
+      ["3:00 PM", "to", "3:50 PM"],
+      ["4:00 PM", "to", "4:50 PM"],
+      ["5:00 PM", "to", "5:50 PM"],
+      ["6:00 PM", "to", "6:50 PM"],
+      ["6:51 PM", "", ""]
+    ];
+
+    const labHeaders = [
+      ["08:00 AM", "to", "08:50 AM"],
+      ["08:50 AM", "to", "09:40 AM"],
+      ["09:50 AM", "to", "10:40 AM"],
+      ["10:40 AM", "to", "11:30 AM"],
+      ["11:40 AM", "to", "12:30 PM"],
+      ["12:30 PM", "to", "01:10 PM"],
+      ["Lunch", "", ""],
+      ["2:00 PM", "to", "2:50 PM"],
+      ["2:50 PM", "to", "3:40 PM"],
+      ["3:50 PM", "to", "04:40 PM"],
+      ["4:40 PM", "to", "5:30 PM"],
+      ["5:40 PM", "to", "6:30 PM"],
+      ["6:30 PM", "to", "7:10 PM"]
+    ];
+
+    const rows = [
+      { day: "TUE", theory: ["TFF1", "A1", "B1", "TC1/G1", "D1", "", "", "F2", "A2", "B2", "TC2/G2", "TDD2", ""], lab: ["L1", "L2", "L3", "L4", "L5", "L6", "", "L31", "L32", "L33", "L34", "L35", "L36"] },
+      { day: "WED", theory: ["TGG1", "D1", "F1", "E1/SC2", "B1", "", "", "D2", "TF2/G2", "E2/SC1", "B2", "TCC2", ""], lab: ["L7", "L8", "L9", "L10", "L11", "L12", "", "L37", "L38", "L39", "L40", "L41", "L42"] },
+      { day: "THU", theory: ["TEE1", "C1", "TD1/TG1", "TAA1/ECS", "TBB1/CLUB", "", "", "TE2/SE1", "C2", "TD2/TG2", "A2", "TFF2", ""], lab: ["L13", "L14", "L15", "L16", "L17", "L18", "", "L43", "L44", "L45", "L46", "L47", "L48"] },
+      { day: "FRI", theory: ["TCC1", "TB1", "TA1", "F1", "TE1/SD2", "", "", "C2", "TB2", "TA2", "F2", "TEE2", ""], lab: ["L19", "L20", "L21", "L22", "L23", "L24", "", "L49", "L50", "L51", "L52", "L53", "L54"] },
+      { day: "SAT", theory: ["TDD1", "E1/SE2", "C1", "TF1/G1", "A1", "", "", "D2", "E2/SD1", "TAA2/ECS", "TBB2/CLUB", "TGG2", ""], lab: ["L25", "L26", "L27", "L28", "L29", "L30", "", "L55", "L56", "L57", "L58", "L59", "L60"] }
+    ];
+
+    const theoryMinutes = [
+      [480, 530],
+      [540, 590],
+      [600, 650],
+      [660, 710],
+      [720, 770],
+      null,
+      null,
+      [840, 890],
+      [900, 950],
+      [960, 1010],
+      [1020, 1070],
+      [1080, 1130],
+      null
+    ];
+
+    const labMinutes = [
+      [480, 530],
+      [530, 580],
+      [590, 640],
+      [640, 690],
+      [700, 750],
+      [750, 790],
+      null,
+      [840, 890],
+      [890, 940],
+      [950, 1000],
+      [1000, 1050],
+      [1060, 1110],
+      [1110, 1150]
+    ];
+
+    const state = JSON.parse(localStorage.getItem("ffcsSelections") || "{}");
+
+    function optionValue(option) {
+      return [option.slot, option.venue, option.faculty].join("||");
+    }
+
+    function optionLabel(option) {
+      const venue = option.venue ? ` (${option.venue})` : "";
+      const seats = option.availability ? ` - ${option.availability} seats` : "";
+      return `${option.slot} - ${option.faculty}${venue}${seats}`;
+    }
+
+    function findOption(options, value) {
+      return options.find(option => optionValue(option) === value) ||
+        options.find(option => option.slot === value);
+    }
+
+    function tokens(value) {
+      return (value || "").split("+").map(item => item.trim()).filter(Boolean);
+    }
+
+    function cellTokens(label) {
+      return label.split("/").map(item => item.trim()).filter(Boolean);
+    }
+
+    function buildSlotIndex() {
+      const index = { theory: {}, lab: {} };
+      rows.forEach(row => {
+        ["theory", "lab"].forEach(kind => {
+          const minutes = kind === "theory" ? theoryMinutes : labMinutes;
+          row[kind].forEach((slotLabel, indexInDay) => {
+            const range = minutes[indexInDay];
+            if (!slotLabel || !range) return;
+            cellTokens(slotLabel).forEach(token => {
+              index[kind][token] = index[kind][token] || [];
+              index[kind][token].push({
+                day: row.day,
+                start: range[0],
+                end: range[1],
+                token,
+                kind
+              });
+            });
+          });
+        });
+      });
+      return index;
+    }
+
+    const slotIndex = buildSlotIndex();
+
+    function intervalsFor(kind, slot) {
+      return tokens(slot).flatMap(token => slotIndex[kind][token] || []);
+    }
+
+    function entriesOverlap(first, second) {
+      return first.intervals.some(a =>
+        second.intervals.some(b =>
+          a.day === b.day && a.start < b.end && b.start < a.end
+        )
+      );
+    }
+
+    function entryFromOption(course, kind, option) {
+      return {
+        course,
+        kind,
+        slot: option.slot,
+        faculty: option.faculty,
+        venue: option.venue,
+        availability: option.availability,
+        label: optionLabel(option),
+        parts: tokens(option.slot),
+        intervals: intervalsFor(kind, option.slot)
+      };
+    }
+
+    function sameSelect(entry, courseCode, kind) {
+      return entry.course.code === courseCode && entry.kind === kind;
+    }
+
+    function updateOptionAvailability() {
+      const entries = selectedEntries();
+      document.querySelectorAll("select[data-course][data-kind]").forEach(select => {
+        const { course: courseCode, kind } = select.dataset;
+        const course = courses.find(item => item.code === courseCode);
+        if (!course) return;
+
+        Array.from(select.options).forEach(optionElement => {
+          if (!optionElement.value) return;
+          const option = findOption(course[kind], optionElement.value);
+          if (!option) return;
+          const candidate = entryFromOption(course, kind, option);
+          const clashingEntry = entries.find(entry =>
+            !sameSelect(entry, courseCode, kind) && entriesOverlap(candidate, entry)
+          );
+
+          optionElement.disabled = Boolean(clashingEntry);
+          optionElement.textContent = clashingEntry
+            ? `${optionLabel(option)} - clashes with ${clashingEntry.course.code}`
+            : optionLabel(option);
+        });
+      });
+    }
+
+    function renderCards() {
+      const mount = document.getElementById("courses");
+      mount.innerHTML = "";
+
+      courses.forEach(course => {
+        const card = document.createElement("article");
+        card.className = "course-card";
+        card.style.setProperty("--accent", course.color);
+
+        card.innerHTML = `
+          <h2>${course.code} <small>${course.title}</small></h2>
+          <label for="${course.code}-theory">Theory Slot:</label>
+          <select id="${course.code}-theory" data-course="${course.code}" data-kind="theory">
+            <option value="">-- Select Theory Slot --</option>
+            ${course.theory.map(option => `<option value="${optionValue(option)}">${optionLabel(option)}</option>`).join("")}
+          </select>
+          <label for="${course.code}-lab">Lab Slot:</label>
+          <select id="${course.code}-lab" data-course="${course.code}" data-kind="lab" ${course.lab.length ? "" : "disabled"}>
+            <option value="">${course.lab.length ? "-- Select Lab Slot --" : "-- No Lab Slot --"}</option>
+            ${course.lab.map(option => `<option value="${optionValue(option)}">${optionLabel(option)}</option>`).join("")}
+          </select>
+        `;
+        mount.appendChild(card);
+
+        const current = state[course.code] || {};
+        const theory = findOption(course.theory, current.theory || "");
+        const lab = findOption(course.lab, current.lab || "");
+        card.querySelector("[data-kind='theory']").value = theory ? optionValue(theory) : "";
+        card.querySelector("[data-kind='lab']").value = lab ? optionValue(lab) : "";
+      });
+
+    }
+
+    document.getElementById("courses").addEventListener("change", event => {
+      if (event.target.tagName !== "SELECT") return;
+      const { course, kind } = event.target.dataset;
+      state[course] = state[course] || {};
+      state[course][kind] = event.target.value;
+      localStorage.setItem("ffcsSelections", JSON.stringify(state));
+      updateOptionAvailability();
+      renderTable();
+    });
+
+    function selectedEntries() {
+      const entries = [];
+      courses.forEach(course => {
+        const selected = state[course.code] || {};
+        ["theory", "lab"].forEach(kind => {
+          const option = findOption(course[kind], selected[kind] || "");
+          if (option) {
+            entries.push(entryFromOption(course, kind, option));
+          }
+        });
+      });
+      return entries;
+    }
+
+    function matchingEntries(slotLabel, kind, entries) {
+      const labels = cellTokens(slotLabel);
+      return entries.filter(entry => entry.kind === kind && entry.parts.some(part => labels.includes(part)));
+    }
+
+    function formatHeader(parts) {
+      return parts.filter(Boolean).join("<br>");
+    }
+
+    function cellHtml(slotLabel, kind, entries) {
+      if (!slotLabel) return "";
+      const hits = matchingEntries(slotLabel, kind, entries);
+      const base = `<span class="base">${slotLabel}</span>`;
+      if (!hits.length) return base;
+      const chips = hits.map(hit => `<span class="chip" style="background:${hit.course.color}">${hit.course.code}<br>${hit.slot}<br>${hit.faculty}</span>`).join("");
+      return `<div class="cell-stack">${base}${chips}</div>`;
+    }
+
+    function renderTable() {
+      const table = document.getElementById("timetable");
+      const entries = selectedEntries();
+      const conflicts = findConflicts(entries);
+      const conflictKeys = new Set(conflicts.map(item => item.key));
+
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th class="row-head">THEORY<br>HOURS</th>
+            ${timeHeaders.map((head, index) => `<th class="${index === 6 ? "lunch" : ""}">${formatHeader(head)}</th>`).join("")}
+          </tr>
+          <tr>
+            <th class="row-head">LAB<br>HOURS</th>
+            ${labHeaders.map((head, index) => `<th class="${index === 6 ? "lunch" : ""}">${formatHeader(head)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <th class="day">${row.day}</th>
+              ${row.theory.map((slot, index) => `<td class="${index === 6 ? "lunch" : ""} ${conflictKeys.has(`${row.day}-theory-${slot}`) ? "conflict" : ""}">${cellHtml(slot, "theory", entries)}</td>`).join("")}
+            </tr>
+            <tr>
+              <th class="day">${row.day}</th>
+              ${row.lab.map((slot, index) => `<td class="${index === 6 ? "lunch" : ""} ${conflictKeys.has(`${row.day}-lab-${slot}`) ? "conflict" : ""}">${cellHtml(slot, "lab", entries)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      `;
+
+      const notice = document.getElementById("notice");
+      if (conflicts.length) {
+        notice.className = "notice show";
+        notice.textContent = "Slot conflict: " + conflicts.map(item => item.text).join(" | ");
+      } else {
+        notice.className = "notice";
+        notice.textContent = "";
+      }
+
+      document.getElementById("legend").innerHTML = courses
+        .map(course => `<span><i class="dot" style="--dot:${course.color}"></i>${course.code}</span>`)
+        .join("");
+    }
+
+    function findConflicts(entries) {
+      const conflicts = [];
+      entries.forEach((entry, index) => {
+        entries.slice(index + 1).forEach(otherEntry => {
+          if (!entriesOverlap(entry, otherEntry)) return;
+          conflicts.push({
+            key: `${entry.course.code}-${otherEntry.course.code}`,
+            text: `${entry.course.code} ${entry.slot} clashes with ${otherEntry.course.code} ${otherEntry.slot}`
+          });
+        });
+      });
+      return conflicts;
+    }
+
+    function clearAll() {
+      courses.forEach(course => state[course.code] = { theory: "", lab: "" });
+      localStorage.removeItem("ffcsSelections");
+      document.querySelectorAll("select").forEach(select => select.value = "");
+      updateOptionAvailability();
+      renderTable();
+    }
+
+    function downloadTimetable() {
+      const chosen = selectedEntries();
+      const lines = [
+        "FFCS Timetable Planner",
+        "Generated from Fall Semester 2026-27 annexure data",
+        "",
+        "Selected Slots:"
+      ];
+
+      courses.forEach(course => {
+        const selected = state[course.code] || {};
+        lines.push(`${course.code} - ${course.title}`);
+        const theory = findOption(course.theory, selected.theory || "");
+        const lab = findOption(course.lab, selected.lab || "");
+        lines.push(`  Theory: ${theory ? optionLabel(theory) : "Not selected"}`);
+        lines.push(`  Lab: ${course.lab.length ? (lab ? optionLabel(lab) : "Not selected") : "No lab slot"}`);
+      });
+
+      lines.push("", "Active Classes:");
+      rows.forEach(row => {
+        ["theory", "lab"].forEach(kind => {
+          row[kind].forEach(slot => {
+            const hits = matchingEntries(slot, kind, chosen);
+            hits.forEach(hit => lines.push(`${row.day} ${kind.toUpperCase()} ${slot}: ${hit.course.code} (${hit.label})`));
+          });
+        });
+      });
+
+      const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "ffcs-timetable.txt";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    document.getElementById("clearBtn").addEventListener("click", clearAll);
+    document.getElementById("downloadBtn").addEventListener("click", downloadTimetable);
+
+    renderCards();
+    updateOptionAvailability();
+    renderTable();
+  </script>
+</body>
+</html>
